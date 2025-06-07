@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-from routes.candidates  import candidates
 from routes.tournaments import tournaments
 from routes.votes import votes
 
