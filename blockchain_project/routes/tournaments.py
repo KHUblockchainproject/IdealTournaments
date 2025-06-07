@@ -42,6 +42,19 @@ def create_tournament(data, db_path):
         # 블록체인 서버의 토너먼트 deploy endpoint
         response = requests.post("http://BLOCKCHAIN_SERVER_ADDRESS/deploy", json=blockchain_payload)
         response.raise_for_status()
+
+        contract_data = response.json()
+        contract_address = contract_data.get("contract_address")
+
+        if contract_address:
+            conn = get_db(db_path)
+            cur = conn.cursor()
+            cur.execute("UPDATE tournaments SET contract_address = ? WHERE tournament_id = ?",(contract_address, tournament_id))
+            conn.commit()
+            conn.close()
+        else:
+            print("contract_address가 응답에 없음")
+
     except Exception as e:
         print("블록체인 서버 호출 실패", e)
     
@@ -63,7 +76,7 @@ def create_tournament_route():
     db_path = current_app.config['DB_PATH']
     tournament_id = create_tournament(data, db_path)
     # 이때 contract_address는 비워짐짐
-    return jsonify({"status": "Success", "tournament_id": tournament_id}), 201
+    return jsonify({"status": "Success", "tournament_id": tournament_id})
 
 # tournaments 전체 조회
 @tournaments.route("/tournaments", methods=["GET"])
@@ -71,21 +84,27 @@ def list_tournaments_route():
     db_path = current_app.config['DB_PATH']
     return jsonify(list_tournaments(db_path))
 
-# 블록체인 서버로부터 deploy한 contract의 address를 받음
-@tournaments.route("/update_contract", methods=["POST"])
-def update_contract_address():
-    data = request.get_json()
-    tournament_id = data.get("tournament_id")
-    contract_address = data.get("contract_address")
-
-    if not tournament_id or not contract_address:
-        return jsonify({"error": "tournament_id and contract_address required"}), 400
-
+@tournaments.route("/<int:tournament_id>", methods=["GET"])
+def get_tournament_detail(tournament_id):
     db_path = current_app.config['DB_PATH']
     conn = get_db(db_path)
     cur = conn.cursor()
-    cur.execute("UPDATE tournaments SET contract_address = ? WHERE tournament_id = ?", (contract_address, tournament_id))
-    conn.commit()
+
+    # 1. 토너먼트 정보 조회
+    cur.execute("SELECT * FROM tournaments WHERE tournament_id = ?", (tournament_id,))
+    tournament = cur.fetchone()
+
+    if not tournament:
+        conn.close()
+        return jsonify({"error": "Tournament not found"})
+
+    # 2. 후보 정보 조회
+    cur.execute("SELECT * FROM candidates WHERE tournament_id = ?", (tournament_id,))
+    candidates = [dict(row) for row in cur.fetchall()]
     conn.close()
 
-    return jsonify({"message": "Contract address updated"}), 200
+    # 3. 응답 구성
+    tournament_data = dict(tournament)
+    tournament_data["candidates"] = candidates
+
+    return jsonify(tournament_data)
