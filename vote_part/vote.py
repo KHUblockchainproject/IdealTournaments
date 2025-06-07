@@ -367,6 +367,19 @@ def results():
         return jsonify({"status": "Failed", "totalVotes" : None}), 500
 
 
+@app.route('/tournaments', methods=['POST'])
+def make_tournament():
+    data = request.get_json()
+
+    tournament_id = data['tournament_id']
+    user_wallet_address = data['wallet_address']
+
+    wallet_address = make_token(tournament_id, user_wallet_address)
+
+    contract_address = deploy_contract_with_transaction(tournament_id, wallet_address)
+
+    return jsonify({"contract_address" : contract_address})
+
 
 if __name__ == "__main__":
     if _init():
