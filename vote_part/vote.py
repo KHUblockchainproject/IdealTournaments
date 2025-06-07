@@ -26,14 +26,14 @@ app = Flask(__name__)
 # Web3 연결
 w3 = Web3(Web3.HTTPProvider(ethereum_node_url))
 
-def load_contracts():
-    with open('ContractAbi.json', 'r') as f:
+def load_contract_abi():
+    with open('vote_part/ContractAbi.json', 'r') as f:
         return json.load(f)
 
-contract_abi = load_contracts()['abi']
+contract_abi = load_contract_abi()['abi']
 
-def save_contracts():
-    with open('ContractAbi.json', 'w') as f:
+def save_contract_abi():
+    with open('vote_part/ContractAbi.json', 'w') as f:
         temp = {"abi" : contract_abi}
         json.dump(temp, f)
 
@@ -88,13 +88,14 @@ def compile_contract():
     
     try:
         #compiled_sol = compile_source(contract_source_code)
-        compiled_sol = compile_files('contract_source_code.sol',
+        compiled_sol = compile_files('vote_part/contract_source_code.sol',
                                      solc_version="0.8.26")
         contract_interface = compiled_sol['<stdin>:SimpleStorage']
         print("컴파일 완료!")
 
         if not contract_abi:
             contract_abi = contract_interface['abi']
+            save_contract_abi()
         
         return contract_interface
 

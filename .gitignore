@@ -1,3 +1,4 @@
 .env
 blockchain_vote/
 temp/
+__pycache__
