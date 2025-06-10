@@ -75,14 +75,14 @@ def create_tournament_route():
     data = request.json
     db_path = current_app.config['DB_PATH']
     tournament_id = create_tournament(data, db_path)
-    # 이때 contract_address는 비워짐짐
+    # 이때 contract_address는 비워짐
     return jsonify({"status": "Success", "tournament_id": tournament_id})
 
 # tournaments 전체 조회
 @tournaments.route("/tournaments", methods=["GET"])
 def list_tournaments_route():
     db_path = current_app.config['DB_PATH']
-    return jsonify(list_tournaments(db_path))
+    return jsonify({"tournaments":list_tournaments(db_path)})
 
 @tournaments.route("/<int:tournament_id>", methods=["GET"])
 def get_tournament_detail(tournament_id):
