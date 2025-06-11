@@ -98,3 +98,42 @@ def check_vote():
     except Exception as e:
         print("투표처리서버 요청 실패:", e)
         return jsonify({"error": "Vote check failed"}), 500
+@votes.route("/vote_query",methods=["POST"])
+def vote_query():
+    data = request.get_json()
+    tournament_id = data["tournament_id"]
+    if not tournament_id:
+        return jsonify({"error": "Missing tournament_id"}), 400
+
+    db_path = current_app.config['DB_PATH']
+    conn = get_db(db_path)
+    cur = conn.cursor()
+
+    cur.execute("SELECT contract_address FROM tournaments WHERE tournament_id = ?", (tournament_id,))
+    row = cur.fetchone()
+    if not row or not row["contract_address"]:
+        return jsonify({"error": "Tournament or contract address not found"}), 404
+
+    cur.execute("SELECT COUNT(*) AS total FROM candidates WHERE tournament_id = ?", (tournament_id,))
+    count_row = cur.fetchone()
+    conn.close()
+
+    total_candidate_count = count_row["total"] if count_row else 0
+
+    contract_address = row["contract_address"]
+    try:
+        payload = {
+            "contract_address": contract_address,
+            "totalCandidateCount":  total_candidate_count
+        }
+
+        response = requests.post("http://localhost:9000/results",json=payload)
+        response.raise_for_status()
+        response_data = response.json()
+    except Exception as e:
+        print("투표 수 조회 실패", e)
+        return jsonify({"error": "Vote query failed"})
+    return jsonify({
+        "status": response_data.get("status", "Unknown"),
+        "totalVotes": response_data.get("totalVotes",[])
+    })
