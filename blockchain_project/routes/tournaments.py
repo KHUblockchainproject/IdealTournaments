@@ -18,12 +18,13 @@ def create_tournament(data, db_path):
     thumb = data["Thumbnail"]
     contract_address = None
     candidates = data.get("Candidates", [])
-    
+
+    print(candidates, type(candidates))
 
     conn = get_db(db_path)
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO tournaments (title, description, wallet_address, thumbnail, contract_address) VALUES (?, ?, ?, ?, ?)",
+    cur.execute("INSERT INTO tournaments (tournament_title, description, wallet_address, thumbnail, contract_address) VALUES (?, ?, ?, ?, ?)",
                 (title, desc, wallet, thumb, contract_address))
     tournament_id = cur.lastrowid
 
@@ -36,7 +37,7 @@ def create_tournament(data, db_path):
 
     try:
         blockchain_payload = {
-            "tournament_id": tournament_id,
+            "tournament_id": int(tournament_id),
             "wallet_address": wallet
         }
         # 블록체인 서버의 토너먼트 deploy endpoint
@@ -72,17 +73,27 @@ def list_tournaments(db_path):
 #tournaments 생성
 @tournaments.route("/create_tournament", methods=["POST"])
 def create_tournament_route():
-    data = request.json
+    #data = request.json
+    data = {'Tournament_title' : request.form.get('Tournament_title'),
+            'Description' : request.form.get('Description'),
+            'Wallet_address' : request.form.get('Wallet_address'),
+            'Thumbnail' : request.form.get('Thumbnail'),
+            'Candidates' : request.form.get('Candidates')}
+
     db_path = current_app.config['DB_PATH']
-    tournament_id = create_tournament(data, db_path)
-    # 이때 contract_address는 비워짐
-    return jsonify({"status": "Success", "tournament_id": tournament_id})
+    try:
+        tournament_id = create_tournament(data, db_path)
+        # 이때 contract_address는 비워짐
+        return jsonify({"status": "Success", "tournament_id": tournament_id}), 200
+    except Exception as e:
+        print(f"월드컵 생성 중 오류 발생 : {e}")
+        return jsonify({"status": "Failed", "tournament_id": tournament_id}), 500
 
 # tournaments 전체 조회
 @tournaments.route("/tournaments", methods=["GET"])
 def list_tournaments_route():
     db_path = current_app.config['DB_PATH']
-    return jsonify({"tournaments":list_tournaments(db_path)})
+    return jsonify({"tournaments":list_tournaments(db_path)}), 200
 
 @tournaments.route("/<int:tournament_id>", methods=["GET"])
 def get_tournament_detail(tournament_id):
@@ -96,7 +107,7 @@ def get_tournament_detail(tournament_id):
 
     if not tournament:
         conn.close()
-        return jsonify({"error": "Tournament not found"})
+        return jsonify({"error": "Tournament not found"}), 500
 
     # 2. 후보 정보 조회
     cur.execute("SELECT * FROM candidates WHERE tournament_id = ?", (tournament_id,))
@@ -107,4 +118,4 @@ def get_tournament_detail(tournament_id):
     tournament_data = dict(tournament)
     tournament_data["candidates"] = candidates
 
-    return jsonify(tournament_data)
+    return jsonify(tournament_data), 200

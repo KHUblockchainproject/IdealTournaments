@@ -2,3 +2,4 @@
 blockchain_vote/
 temp/
 __pycache__
+blockchain_project/db/tournament.db-journal

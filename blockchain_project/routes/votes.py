@@ -48,13 +48,13 @@ def vote():
         response.raise_for_status()
         # 응답에 대해 사용자로 콜백
         result = response.json()
-        return jsonify(result)
+        return jsonify(result), 200
     
         #디버깅용용
         #return jsonify(payload)
     except Exception as e:
         print("블록체인 서버 호출 실패:", e)
-        return jsonify({"error": "Blockchain vote failed"})
+        return jsonify({"error": "Blockchain vote failed"}), 500
 
 @votes.route("/check_voted", methods=["POST"])
 def check_vote():
