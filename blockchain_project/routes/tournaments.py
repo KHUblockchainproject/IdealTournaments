@@ -23,7 +23,7 @@ def create_tournament(data, db_path):
     conn = get_db(db_path)
     cur = conn.cursor()
 
-    cur.execute("INSERT INTO tournaments (title, description, wallet_address, thumbnail, contract_address) VALUES (?, ?, ?, ?, ?)",
+    cur.execute("INSERT INTO tournaments (tournament_title, description, wallet_address, thumbnail, contract_address) VALUES (?, ?, ?, ?, ?)",
                 (title, desc, wallet, thumb, contract_address))
     tournament_id = cur.lastrowid
 
