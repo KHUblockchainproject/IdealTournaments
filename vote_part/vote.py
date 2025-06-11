@@ -263,10 +263,11 @@ def vote():
         candidate_id : uint8,
         wallet_address : str
     '''
-    tournament_id = int(request.form.get('tournament_id'))
-    contract_address = request.form.get('contract_address')
-    candidate_id = int(request.form.get('candidate_id'))
-    user_wallet_address = request.form.get('wallet_address')
+    data = request.json
+    tournament_id = int(data.get('tournament_id'))
+    contract_address = data.get('contract_address')
+    candidate_id = int(data.get('candidate_id'))
+    user_wallet_address = data.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
     
@@ -301,9 +302,10 @@ def isVoted():
         contract_address : str,
         wallet_address : str
     '''
-    tournament_id = int(request.form.get('tournament_id'))
-    contract_address = request.form.get('contract_address')
-    user_wallet_address = request.form.get('wallet_address')
+    data = request.json
+    tournament_id = int(data.get('tournament_id'))
+    contract_address = data.get('contract_address')
+    user_wallet_address = data.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
 
@@ -329,9 +331,10 @@ def results():
         contract_address : str,
         totalCandidateCount : uint8
     '''
-    #tournament_id = request.form.get('tournament_id')
-    contract_address = request.form.get('contract_address')
-    total_candidate_count = int(request.form.get('totalCandidateCount'))
+    data = request.json
+    
+    contract_address = data.get('contract_address')
+    total_candidate_count = int(data.get('totalCandidateCount'))
 
     contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
@@ -355,8 +358,10 @@ def make_tournament():
         tournament_id : uint256,
         wallet_address : str
     '''
-    tournament_id = int(request.form.get('tournament_id'))
-    user_wallet_address = request.form.get('wallet_address')
+    data = request.json
+
+    tournament_id = int(data.get('tournament_id'))
+    user_wallet_address = data.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
 

@@ -3,6 +3,7 @@
 from flask import Blueprint, request, jsonify, current_app
 import sqlite3
 import requests
+import json
 
 tournaments = Blueprint('tournaments', __name__)
 
@@ -18,8 +19,6 @@ def create_tournament(data, db_path):
     thumb = data["Thumbnail"]
     contract_address = None
     candidates = data.get("Candidates", [])
-
-    print(candidates, type(candidates))
 
     conn = get_db(db_path)
     cur = conn.cursor()
@@ -73,12 +72,7 @@ def list_tournaments(db_path):
 #tournaments 생성
 @tournaments.route("/create_tournament", methods=["POST"])
 def create_tournament_route():
-    #data = request.json
-    data = {'Tournament_title' : request.form.get('Tournament_title'),
-            'Description' : request.form.get('Description'),
-            'Wallet_address' : request.form.get('Wallet_address'),
-            'Thumbnail' : request.form.get('Thumbnail'),
-            'Candidates' : request.form.get('Candidates')}
+    data = request.json
 
     db_path = current_app.config['DB_PATH']
     try:

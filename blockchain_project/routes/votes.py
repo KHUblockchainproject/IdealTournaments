@@ -18,8 +18,8 @@ def vote():
     candidate_id = data.get("Candidate_id")
     wallet_address = data.get("Wallet_address")
 
-    if not (tournament_id and candidate_id and wallet_address):
-        return jsonify({"error": "Missing required fields"}), 400
+    # if not (tournament_id and candidate_id and wallet_address):
+    #     return jsonify({"error": "Missing required fields"}), 400
 
     # 1. DB에서 contract_address 조회
     db_path = current_app.config['DB_PATH']
@@ -98,6 +98,7 @@ def check_vote():
     except Exception as e:
         print("투표처리서버 요청 실패:", e)
         return jsonify({"error": "Vote check failed"}), 500
+
 @votes.route("/vote_query",methods=["POST"])
 def vote_query():
     data = request.get_json()
