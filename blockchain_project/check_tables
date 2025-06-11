@@ -1,0 +1,42 @@
+import sqlite3
+
+DB_PATH = "db/tournament.db"  # 실제 DB 경로를 여기에 넣으세요
+
+try:
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    print(f"[✓] Connected to DB: {DB_PATH}\n")
+    print("📋 테이블 목록:")
+
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = cur.fetchall()
+
+    if not tables:
+        print("❌ 테이블이 존재하지 않습니다.")
+    else:
+        for table in tables:
+            print(f" - {table[0]}")
+            cur.execute(f"PRAGMA table_info({table[0]})")
+            columns = cur.fetchall()
+            for col in columns:
+                print(f"    • {col[1]} ({col[2]})")
+
+    conn.close()
+except Exception as e:
+    print("🔥 오류 발생:", e)
+
+conn = sqlite3.connect("db/tournament.db")
+cur = conn.cursor()
+
+print("[Tournaments]")
+cur.execute("SELECT * FROM tournaments")
+for row in cur.fetchall():
+    print(row)
+
+print("\n[Candidates]")
+cur.execute("SELECT * FROM candidates")
+for row in cur.fetchall():
+    print(row)
+
+conn.close()

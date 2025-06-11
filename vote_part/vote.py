@@ -349,7 +349,7 @@ def results():
         return jsonify({"status": "Failed", "totalVotes" : None}), 500
 
 
-@app.route('/tournaments', methods=['POST'])
+@app.route('/create_tournament', methods=['POST'])
 def make_tournament():
     '''
         tournament_id : uint256,
