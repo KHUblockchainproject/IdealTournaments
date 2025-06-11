@@ -3,7 +3,7 @@ from routes.tournaments import tournaments
 from routes.votes import votes
 
 app = Flask(__name__)
-app.config['DB_PATH'] = 'db/tournament.db'
+app.config['DB_PATH'] = 'C:/Users/kimminjae/Desktop/IdealTournaments/blockchain_project/db/tournament.db'
 app.debug = True
 
 # 라우터 등록
