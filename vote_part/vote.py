@@ -5,8 +5,9 @@ import os
 from dotenv import load_dotenv
 import hashlib
 from collections import defaultdict
-from solcx import compile_source, compile_files
+from solcx import compile_files, install_solc, set_solc_version
 import json
+import requests
 
 # .env 파일에서 환경 변수 로드
 '''
@@ -14,7 +15,7 @@ import json
    ADMIN_ADDRESS=<관리자 지갑 주소>
    PRIVATE_KEY=<관리자 개인키>
 '''
-load_dotenv("./.env")
+load_dotenv(".env")
 
 # 계정 설정
 ethereum_node_url = os.getenv('ETHEREUM_NODE_URL')
@@ -26,6 +27,28 @@ app = Flask(__name__)
 # Web3 연결
 w3 = Web3(Web3.HTTPProvider(ethereum_node_url))
 
+def get_chain_id(rpc_url):
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "eth_chainId",
+        "params": [],
+        "id": 1
+    }
+    
+    response = requests.post(rpc_url, json=payload)
+    result = response.json()
+    
+    # 16진수를 10진수로 변환
+    chain_id_hex = result['result']
+    chain_id_decimal = int(chain_id_hex, 16)
+    
+    return chain_id_decimal
+
+# Transaction 생성 시 필요한 ChainID 조회
+chain_id = get_chain_id(ethereum_node_url)
+
+
+# contract의 abi를 저장 및 조회
 def load_contract_abi():
     with open('vote_part/ContractAbi.json', 'r') as f:
         return json.load(f)
@@ -38,59 +61,23 @@ def save_contract_abi():
         json.dump(temp, f)
 
 
-# Solidity 컨트랙트 소스 코드
-contract_source_code = '''
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.8.2 <0.9.0;
-
-contract Vote {
-    address private owner;
-    uint public tournament_id;
-    string creater_wallet_address;
-    mapping(uint8 => uint16) public votes_per_candidate;
-    mapping(string => bool) private voted_wallet_address; // 없는 key값에 접근하면 Default 값인 False return.
-
-    constructor (uint id, string memory wallet_address) {
-        owner = msg.sender;
-        tournament_id = id;
-        creater_wallet_address = wallet_address;
-    }
-
-    function isVoted(string memory wallet_address) public view returns (bool) {
-        require(msg.sender == owner, "Only Server can call");
-        return voted_wallet_address[wallet_address];
-        // for (uint i = 0; i < voted_wallet_address.length; i++) {
-        //     if (keccak256(bytes(voted_wallet_address[i])) == keccak256(bytes(wallet_address))) {
-        //         return true;
-        //     }
-        // }
-    }
-
-    function vote(string memory wallet_address, uint8 candidate_id) external {
-        require(msg.sender == owner, "Only Server can call");
-        require(!isVoted(wallet_address));
-        
-        votes_per_candidate[candidate_id]++;
-        voted_wallet_address[wallet_address] = true;
-        // emit voteEvent(tournament_id, creater_wallet_address, wallet_address, candidate_id);
-    }
-    
-    // event voteEvent(uint tournamentId, bytes32 createrWalletAddress, bytes32 walletAddress, uint8 candidateId);
-}
-'''
-
 def compile_contract():
     """
     Solidity 컨트랙트 컴파일
     """
     global contract_abi
+    solc_version = os.getenv('SOLC_VERSION')
+
+    install_solc(solc_version)
+    set_solc_version(solc_version)
+
     print("=== 컨트랙트 컴파일 중... ===")
     
     try:
-        #compiled_sol = compile_source(contract_source_code)
         compiled_sol = compile_files('vote_part/contract_source_code.sol',
+                                     output_values=['abi', 'bin'],
                                      solc_version="0.8.26")
-        contract_interface = compiled_sol['<stdin>:SimpleStorage']
+        contract_interface = compiled_sol['vote_part/contract_source_code.sol:Vote']
         print("컴파일 완료!")
 
         if not contract_abi:
@@ -118,7 +105,7 @@ def deploy_contract_with_transaction(tournament_id, wallet_address):
 
     if not contract_interface:
         print("컴파일 오류로 인한 컨트랙트 배포 실패!")
-        return None, None
+        return None
 
     
     # 2. 컨트랙트 객체 생성
@@ -139,9 +126,10 @@ def deploy_contract_with_transaction(tournament_id, wallet_address):
     
     # Transaction 데이터 생성
     transaction = contract.constructor(*constructor_args).build_transaction({
+        'chainId' : chain_id,
         'from': deployer_account,
         'gas': 2000000,  # 충분한 가스 설정
-        'gasPrice': w3.to_wei('20', 'gwei'),
+        'gasPrice': w3.to_wei('50', 'gwei'),
         'nonce': w3.eth.get_transaction_count(deployer_account),
     })
     
@@ -158,7 +146,7 @@ def deploy_contract_with_transaction(tournament_id, wallet_address):
     
     # 5. Transaction 전송
     print("Transaction 전송 중...")
-    tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
     print(f"Transaction Hash: {tx_hash.hex()}")
     
     # 6. Transaction 완료 대기
@@ -219,12 +207,12 @@ def send_transaction(contract_function, from_account = deployer_account, private
     transaction = contract_function.build_transaction({
         'from': from_account,
         'gas': 2000000,
-        'gasPrice': w3.to_wei('20', 'gwei'),
+        'gasPrice': w3.to_wei('50', 'gwei'),
         'nonce': w3.eth.get_transaction_count(from_account),
     })
     
     signed_txn = w3.eth.account.sign_transaction(transaction, private_key)
-    tx_hash = w3.eth.send_raw_transaction(signed_txn.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
     
     # Transaction 완료 대기
     w3.eth.wait_for_transaction_receipt(tx_hash)
@@ -244,45 +232,19 @@ def make_token(tournament_id : int, user_wallet_address : str) -> str:
     return hashlib.sha256(new_hash_input).hexdigest()
 
 
-def test_deployed_contract(contract_address, contract_abi=contract_abi):
-    """
-    배포된 Contract 테스트
-    """
-    print(f"\n=== 배포된 Contract 테스트 ===")
-    
-    # Contract 인스턴스 생성
-    contract = w3.eth.contract(address=contract_address, abi=contract_abi)
-    
-    # 1. 초기값 확인 (ETH Call - Transaction 아님)
-    initial_value = contract.functions.getNumber().call()
-    print(f"초기 저장값: {initial_value}")
-    
-    # 2. Owner 확인 (ETH Call - Transaction 아님)
-    owner = contract.functions.owner().call()
-    print(f"Contract Owner: {owner}")
-    
-    # 3. 값 변경 (Transaction 필요)
-    print("\n값을 999로 변경하는 Transaction 전송...")
-    tx_hash = send_transaction(
-        contract.functions.setNumber(999),
-        deployer_account,
-        private_key
-    )
-    print(f"Transaction Hash: {tx_hash.hex()}")
-    
-    # 4. 변경된 값 확인 (ETH Call - Transaction 아님)
-    new_value = contract.functions.getNumber().call()
-    print(f"변경된 값: {new_value}")
-
-
-
 def _init() -> bool:
     """
     Web3 연결 설정
     """
+    global w3
+
+    print("Web3 연결 중...")
+
     if not w3.is_connected():
         print("Web3 연결 실패!")
-        return False
+        while(not w3.is_connected()):
+            print("Web3 연결 재시도 중..")
+            w3 = Web3(Web3.HTTPProvider(ethereum_node_url))
     
     print("Web3 연결 성공!")
     print(f"현재 블록 번호: {w3.eth.block_number}")
@@ -295,12 +257,16 @@ def _init() -> bool:
 
 @app.route('/vote', methods=['POST'])
 def vote():
-    data = request.get_json()
-
-    tournament_id = data['tournament_id']
-    contract_address = data['contract_address']
-    candidate_id = data['candidate_id']
-    user_wallet_address = data['wallet_address']
+    '''
+        tournament_id : uint256,
+        contract_address : str,
+        candidate_id : uint8,
+        wallet_address : str
+    '''
+    tournament_id = int(request.form.get('tournament_id'))
+    contract_address = request.form.get('contract_address')
+    candidate_id = int(request.form.get('candidate_id'))
+    user_wallet_address = request.form.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
     
@@ -308,6 +274,10 @@ def vote():
 
     try:
         print("\n투표 Transaction 전송...")
+        '''
+            wallet_address : str,
+            candidate_id : uint8
+        '''
         tx_hash = send_transaction(
             contract.functions.vote(wallet_address, candidate_id),
             deployer_account,
@@ -326,17 +296,23 @@ def vote():
 
 @app.route('/isVoted', methods=['POST'])
 def isVoted():
-    data = request.get_json()
-
-    tournament_id = data['tournament_id']
-    contract_address = data['contract_address']
-    user_wallet_address = data['wallet_address']
+    '''
+        tournament_id : uint8,
+        contract_address : str,
+        wallet_address : str
+    '''
+    tournament_id = int(request.form.get('tournament_id'))
+    contract_address = request.form.get('contract_address')
+    user_wallet_address = request.form.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
 
     contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
     try:
+        '''
+            wallet_address : str
+        '''
         isvoted = contract.functions.isVoted(wallet_address).call()
 
         return jsonify({"status" : "Success", "isVoted" : isvoted}), 200
@@ -349,15 +325,20 @@ def isVoted():
 
 @app.route('/results', methods=['POST'])
 def results():
-    data = request.get_json()
-
-    tournament_id = data['tournament_id']
-    contract_address = data['contract_address']
-    total_candidate_count = data['totalCandidateCount']
+    '''
+        contract_address : str,
+        totalCandidateCount : uint8
+    '''
+    #tournament_id = request.form.get('tournament_id')
+    contract_address = request.form.get('contract_address')
+    total_candidate_count = int(request.form.get('totalCandidateCount'))
 
     contract = w3.eth.contract(address=contract_address, abi=contract_abi)
 
     try:
+        '''
+            total_candidate_count : uint8
+        '''
         votes_list = contract.functions.getAllCandidatesVote(total_candidate_count).call()
 
         return jsonify({"status" : "Success", "totalVotes" : votes_list}), 200
@@ -370,16 +351,23 @@ def results():
 
 @app.route('/tournaments', methods=['POST'])
 def make_tournament():
-    data = request.get_json()
-
-    tournament_id = data['tournament_id']
-    user_wallet_address = data['wallet_address']
+    '''
+        tournament_id : uint256,
+        wallet_address : str
+    '''
+    tournament_id = int(request.form.get('tournament_id'))
+    user_wallet_address = request.form.get('wallet_address')
 
     wallet_address = make_token(tournament_id, user_wallet_address)
 
-    contract_address = deploy_contract_with_transaction(tournament_id, wallet_address)
+    try:
+        contract_address = deploy_contract_with_transaction(tournament_id, wallet_address)
 
-    return jsonify({"contract_address" : contract_address})
+        return jsonify({"contract_address" : contract_address}), 200
+    
+    except Exception as e:
+        print(f"\n월드컵 생성 중 오류 발생 : {e}")
+        return jsonify({"contract_address" : None}), 500
 
 
 if __name__ == "__main__":

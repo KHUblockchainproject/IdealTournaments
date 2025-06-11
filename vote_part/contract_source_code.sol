@@ -15,7 +15,7 @@ contract Vote {
     }
 
     function isVoted(string memory wallet_address) public view returns (bool) {
-        require(msg.sender == owner, "Only Server can call");
+        //require(msg.sender == owner, "Only Server can call");
         return voted_wallet_address[wallet_address];
     }
 
