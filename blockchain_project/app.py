@@ -3,7 +3,7 @@ from routes.candidates  import candidates
 from routes.tournaments import tournaments
 
 app = Flask(__name__)
-app.config['DB_PATH'] = 'db/tournament.db'
+app.config['DB_PATH'] = 'blockchain_project/db/tournament.db'
 
 # 라우터 등록
 app.register_blueprint(candidates, url_prefix='/api/candidates')
